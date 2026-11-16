@@ -1,0 +1,38 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  Manage a name-keyed escalation policy with ordered alert channel steps.
+---
+
+# ensafely_escalation_policy (Resource)
+
+Manages an escalation policy in the authenticated Tenant. Steps reference alert
+channels by name and remain in the configured order, including repeated channel
+names. Reordering, adding or removing steps updates the policy in place.
+Changing `name` replaces the policy.
+
+Requires Terraform 1.11+ (or OpenTofu 1.11+). Applying changes needs a Tenant
+API key with the `api_write` scope; `api_read` is enough for `terraform plan`.
+
+## Example usage
+
+{{ tffile "examples/resources/ensafely_escalation_policy/resource.tf" }}
+
+Use alert channel names from the same Tenant. Each `delay_min` is measured from
+the initial failure, not from the preceding step; zero means immediately. The
+provider preserves the declared order without sorting by delay or channel.
+
+{{ .SchemaMarkdown | trimspace }}
+
+Read and import use `GET /api/escalation-policies/:name`. Refresh observes
+external step changes. A missing policy is removed from state and planned for
+creation again. Destroy deletes the policy; an already-missing policy is treated
+as deleted.
+
+## Import
+
+{{ codefile "shell" "examples/resources/ensafely_escalation_policy/import.sh" }}
+
+Import retrieves all steps in their persisted order. No secrets are stored on
+this resource; alert channel credentials belong to the channels themselves.

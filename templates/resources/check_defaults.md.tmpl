@@ -1,0 +1,50 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  Manage the Tenant's check defaults, which Checks inherit for settings they leave null.
+---
+
+# ensafely_check_defaults (Resource)
+
+Manages the Tenant's check defaults: the values an `ensafely_check` uses for
+the settings it leaves null (interval, retries, timeouts, re-alert interval,
+severity, alert channels and escalation policy). There is one per Tenant.
+
+Every attribute is optional and maps to one stored override. An omitted (or
+null) attribute is not overridden, so the built-in default applies and never
+appears in state. Creating the resource replaces whatever defaults are stored
+with this configuration; a change made in the settings editor shows up as
+drift on the next plan.
+
+Checks that leave a setting null follow these defaults without a diff on the
+`ensafely_check`, so changing this resource never plans changes to Checks.
+
+Requires Terraform 1.11+ (or OpenTofu 1.11+). Applying changes needs a Tenant
+API key with the `api_write` scope; `api_read` is enough for `terraform plan`.
+
+## Example usage
+
+{{ tffile "examples/resources/ensafely_check_defaults/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+Empty values (`""`, `[]`, `{}`, an empty timeout) are rejected: omit the
+attribute instead. The API stores them as "not overridden", so they would read
+back as null.
+
+## Destroy
+
+Destroy resets **every** default to the built-in value (`PUT {}`); it does not
+restore the values that were stored before Terraform managed the resource.
+
+A new Tenant is provisioned with `alert_channels = ["Email"]`. Destroy removes
+that too, so Checks without their own `alert_channels` stop alerting until
+default channels are set again (in Terraform or in Settings → Check defaults).
+
+## Import
+
+{{ codefile "shell" "examples/resources/ensafely_check_defaults/import.sh" }}
+
+The import ID is always `current`. Import reads the stored overrides; a fresh
+Tenant imports with only `alert_channels = ["Email"]` set.

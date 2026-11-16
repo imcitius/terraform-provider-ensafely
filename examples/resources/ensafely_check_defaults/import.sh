@@ -1,0 +1,1 @@
+terraform import ensafely_check_defaults.current current

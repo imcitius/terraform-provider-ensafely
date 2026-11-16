@@ -1,0 +1,3 @@
+# Local provider builds (dev_overrides) and goreleaser output.
+/bin/
+/dist/

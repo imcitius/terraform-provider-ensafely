@@ -1,0 +1,24 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  Read an Ensafely Check by UUID.
+---
+
+# ensafely_check (Data Source)
+
+Reads one Check by UUID. It has the same attributes as the
+[`ensafely_check` resource](../resources/check.md), all read-only, plus `type`.
+Secrets are not readable. Inheritable settings that the check leaves to the
+Tenant's check defaults are null; the data source does not resolve effective
+values.
+
+For a type this provider version does not manage (for example `pgsql_replication`), `type`
+and the common attributes are set and every type attribute is null.
+
+## Example usage
+
+{{ tffile "examples/data-sources/ensafely_check/data-source.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+

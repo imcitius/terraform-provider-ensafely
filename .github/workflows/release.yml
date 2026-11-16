@@ -1,0 +1,73 @@
+# Release workflow of the public mirror github.com/imcitius/terraform-provider-ensafely.
+#
+# This file is maintained in the private monorepo at
+# packages/terraform-provider/.github/workflows/release.yml and copied into
+# the mirror by its sync workflow; it does nothing in the monorepo. A vX.Y.Z tag
+# pushed by the sync runs goreleaser (.goreleaser.yml), which publishes a
+# GitHub release with the zips, the GPG-signed SHA256SUMS and the registry
+# manifest. The Terraform and OpenTofu registries pick the release up from
+# there. Procedure and owner setup: docs/operations/tfprovider-release.md in
+# the monorepo.
+#
+# Runs on GitHub-hosted runners only: never attach a self-hosted runner to a
+# public repository. Secrets of the mirror: GPG_PRIVATE_KEY (ASCII-armored
+# private signing key) and GPG_PASSPHRASE.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require release secrets
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          missing=0
+          for name in GPG_PRIVATE_KEY GPG_PASSPHRASE; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository secret $name is not set; see docs/operations/tfprovider-release.md in the monorepo."
+              missing=1
+            fi
+          done
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME is not a stable vX.Y.Z version."
+            missing=1
+          fi
+          exit "$missing"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.x'
+          cache-dependency-path: go.sum
+      - name: Import signing key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Run goreleaser
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          # Keep equal to GORELEASER_VERSION in the monorepo's
+          # scripts/release-tfprovider.sh (its --check compares them).
+          version: v2.20.2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}

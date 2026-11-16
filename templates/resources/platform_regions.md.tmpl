@@ -1,0 +1,42 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  Manage the Platform probe regions selected for the Tenant.
+---
+
+# ensafely_platform_regions (Resource)
+
+Manages the Platform probe regions selected for the Tenant: the
+Ensafely-operated regions its `saas_only` and `multi_region` Checks run in.
+There is one per Tenant. Creating the resource replaces the current selection.
+
+The Plan limits how many regions can be selected: Free 2, Pro 5, Enterprise
+unlimited. Selecting more fails at apply with an `Ensafely plan limit reached`
+error that names the limit and the selected regions; a region that does not
+exist fails with `Unknown platform region`. List the selectable regions and
+the limit with the
+[`ensafely_platform_regions_available`](../data-sources/platform_regions_available.md)
+data source.
+
+Requires Terraform 1.11+ (or OpenTofu 1.11+). Applying changes needs a Tenant
+API key with the `api_write` scope; `api_read` is enough for `terraform plan`.
+
+## Example usage
+
+{{ tffile "examples/resources/ensafely_platform_regions/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Destroy
+
+Destroy resets the selection to the **Plan's default regions**
+(`DELETE /api/platform-regions`), not to an empty selection: the Plan's
+defaults that a Probe currently serves, capped at the Plan's limit. This is
+the selection a new Tenant on the same Plan starts with.
+
+## Import
+
+{{ codefile "shell" "examples/resources/ensafely_platform_regions/import.sh" }}
+
+The import ID is always `current`.

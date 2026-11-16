@@ -1,0 +1,49 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  Manage group settings overrides while preserving maintenance windows.
+---
+
+# ensafely_group_settings (Resource)
+
+Manages the stored settings overrides for a group within a project.
+It does not create or delete projects, groups or Checks. Manage each settings
+key with only one Terraform resource/state to avoid competing writes.
+
+Omitted or null overrides retain inheritance intent; the provider never copies
+an effective default into state. Group overrides inherit from project settings, then Tenant defaults.
+These resources manage API storage; they do not change the server's runtime
+inheritance behavior.
+
+**Destroy resets all three overrides to null**, restoring inheritance. The API
+has no delete operation for settings. The settings row can remain on the server.
+Maintenance windows are outside Terraform: UI maintenance changes produce no
+drift and are preserved on create, update and destroy. There are no maintenance
+attributes in this resource.
+
+## Example usage
+
+{{ tffile "examples/resources/ensafely_group_settings/resource.tf" }}
+
+Remove an argument or set it to `null` to clear that override on the next apply.
+Explicit `false` is retained, rather than treated as an omitted value.
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+{{ codefile "shell" "examples/resources/ensafely_group_settings/import.sh" }}
+
+Or use an import block (with `terraform plan -generate-config-out=generated.tf`
+to generate configuration):
+
+```terraform
+import {
+  to = ensafely_group_settings.example
+  id = "production/database"
+}
+```
+
+An absent settings row is returned by the API as null overrides and can be
+imported. Import reads stored overrides, never maintenance windows.

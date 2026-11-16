@@ -1,0 +1,80 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  Manage a name-keyed alert channel (email, Telegram, Slack, Discord or webhook) with write-only secrets.
+---
+
+# ensafely_alert_channel (Resource)
+
+Manages an alert channel in the authenticated Tenant: where alerts of the
+Checks that list the channel in `alert_channels` are sent. A channel has a
+`name` and **exactly one** type block: `email`, `telegram`, `slack`,
+`discord` or `webhook`.
+
+- The name is the channel's identity. Changing `name` replaces the channel.
+  Checks that reference it, for example
+  `alert_channels = [ensafely_alert_channel.team.name]`, show their
+  `alert_channels` change in the same plan and are updated in place.
+  Deviation from #116: on rename, referencing Checks are updated in place (UUID and history kept), not replaced (Director decision 2026-11-15).
+- Changing the type block replaces the channel. Other changes are in place.
+- Every secret (bot tokens, signing secret, webhook URLs, the webhook HMAC
+  secret and headers) is a write-only argument, see [Secrets](#secrets).
+
+Requires Terraform 1.11+ (or OpenTofu 1.11+). Applying changes needs a Tenant
+API key with the `api_write` scope; `api_read` is enough for `terraform plan`.
+
+## Example usage
+
+{{ tffile "examples/resources/ensafely_alert_channel/resource.tf" }}
+
+The variables are declared with `ephemeral = true` (Terraform 1.10+) so the
+values are never stored; see `examples/resources/ensafely_alert_channel`.
+
+## Secrets
+
+Each secret is a pair:
+
+- `<field>_wo` (write-only, sensitive): never stored in plan or state. It is
+  sent on create, and on update only when `<field>_wo_version` changes.
+- `<field>_wo_version` (Number): a plain number you increase to send the
+  current `<field>_wo` again, that is, to rotate it. It is required whenever
+  `<field>_wo` is set.
+
+Changing `<field>_wo` without changing its version is an empty plan and sends
+nothing. To clear a stored secret, remove `<field>_wo` and change its version.
+The API returns secrets masked (`****`), so changes made to them outside
+Terraform are not detected, and `****` is rejected as a value. The webhook
+`headers_wo` map is sent as a whole and replaces the stored headers.
+
+{{ .SchemaMarkdown | trimspace }}
+
+Every non-secret argument is optional unless marked required; an empty string
+is rejected (omit the argument instead), and removing an argument removes the
+setting from the channel.
+
+## Behaviour
+
+- Read and import use `GET /api/alert-channels/:name`. Refresh detects changes
+  to non-secret settings and a type changed outside Terraform (which plans a
+  replacement). A missing channel is removed from state and planned for
+  creation again.
+- Update sends the full non-secret configuration of the block (`PUT`).
+  Settings this schema does not model, such as the legacy SMTP settings of old
+  email channels, are kept.
+- Channel types this provider does not manage (for example Teams, PagerDuty,
+  Opsgenie, ntfy) cannot be read or imported; the error names the type.
+- Destroy deletes the channel; an already-missing channel is treated as
+  deleted. The default `Email` channel of every Tenant cannot be deleted: stop
+  managing it with a `removed` block (`lifecycle { destroy = false }`) or
+  `terraform state rm`.
+- Create of a name that already exists fails with a hint to import it.
+
+## Import
+
+{{ codefile "shell" "examples/resources/ensafely_alert_channel/import.sh" }}
+
+Import reads the type block and its non-secret settings. Secrets and their
+versions are not read back: set `<field>_wo` and `<field>_wo_version` in
+configuration after import. The first apply then sends those secrets once,
+because the version changes from unset.

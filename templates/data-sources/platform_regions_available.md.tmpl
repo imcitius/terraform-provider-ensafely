@@ -1,0 +1,21 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  List the Platform probe regions the Tenant can select, and the Plan's limit.
+---
+
+# ensafely_platform_regions_available (Data Source)
+
+Lists the Platform probe regions that can be selected in
+[`ensafely_platform_regions`](../resources/platform_regions.md), and how many
+the Tenant's Plan allows.
+
+## Example usage
+
+{{ tffile "examples/data-sources/ensafely_platform_regions_available/data-source.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+A region can be selected while its Probe is disconnected.
+

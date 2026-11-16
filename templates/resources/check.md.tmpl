@@ -1,0 +1,72 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  Manage an Ensafely Check.
+---
+
+# ensafely_check (Resource)
+
+Manages one Check. Each check has common settings and **exactly one** type
+block: `http`, `tcp`, `icmp`, `dns`, `ssl_cert`, `domain_expiry`, `passive`,
+`pgsql_query`, `mysql_query`, `redis`, `mongodb`, `ssh`, `smtp`, `grpc_health`
+or `websocket`.
+Changing the type block replaces the check; other changes are in place.
+
+**Inheritance.** `interval`, `severity`, `alert_channels`, `re_alert_interval`,
+`retry_count`, `retry_interval` and `escalation_policy` are optional and never
+computed. Leave them null to use the Tenant's check defaults: the provider does
+not copy effective values into state, so changing the check defaults causes no
+diff on such checks.
+
+**Identity.** The provider generates the check UUID and sends it on create, so
+a retried create does not make a second check. `id` is the UUID.
+
+**Secrets.** Inline secrets are write-only (`<field>_wo`, Terraform 1.11+) and
+never stored in plan or state: the HTTP basic-auth password and request headers,
+the `password_wo` of `pgsql_query`, `mysql_query`, `redis` and `smtp`, and the
+whole MongoDB URI (`mongodb.uri_wo`). A secret is sent on
+create and, afterwards, only when its `<field>_wo_version` changes. Removing the
+value and changing the version clears the stored secret. Changes made outside
+Terraform to secret values are not detected.
+
+**Connections.** Instead of inline credentials, `http`, `pgsql_query`,
+`mysql_query` and `mongodb` checks can set `connection_id` to an
+[`ensafely_connection`](connection.md) of the matching type (`http`,
+`postgres`, `mysql`, `mongo`). The Connection supplies host, port and
+credentials when the check runs, so `host` (`http.url`, `mongodb.uri_wo`) is
+then optional. Setting `connection_id` together with an inline credential
+(`username`, `basic_auth_user`, `password_wo`, `basic_auth_password_wo`,
+`uri_wo`) is a validation error, and inline credential secrets stored earlier
+are cleared. Other check types reject `connection_id`. Removing
+`connection_id` removes the reference and sends the configured inline secrets
+again, without a version change.
+
+## Example usage
+
+{{ tffile "examples/resources/ensafely_check/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+Durations are Go durations such as `30s`, `5m` or `1h`. The API stores empty
+strings, empty lists and `0` as "unset", so these are rejected: omit the
+argument (or set `null`) instead.
+
+Exactly one type block (`http`, `tcp`, `icmp`, `dns`, `ssl_cert`,
+`domain_expiry`, `passive`, `pgsql_query`, `mysql_query`, `redis`, `mongodb`,
+`ssh`, `smtp`, `grpc_health`, `websocket`) is required. Arguments described as
+*Required* are required when their block is present. Boolean arguments
+default to `false`; every `timeout` defaults to the type's default.
+
+The replication and time-query database types (`pgsql_replication`,
+`pgsql_replication_status`, `pgsql_query_unixtime`, `pgsql_query_timestamp`,
+`mysql_replication`, `mysql_query_unixtime`) are not managed by this provider
+version; importing such a check fails with a clear error.
+
+## Import
+
+{{ codefile "shell" "examples/resources/ensafely_check/import.sh" }}
+
+Secrets and their `_wo_version` numbers cannot be read back; set the versions
+in configuration after import (a version change sends the configured secret).
+`terraform plan -generate-config-out` works for existing checks.

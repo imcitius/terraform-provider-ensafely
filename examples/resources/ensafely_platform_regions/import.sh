@@ -1,0 +1,1 @@
+terraform import ensafely_platform_regions.current current

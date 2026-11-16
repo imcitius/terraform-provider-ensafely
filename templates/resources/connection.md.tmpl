@@ -1,0 +1,80 @@
+---
+page_title: "{{.Name}} {{.Type}} - Ensafely"
+subcategory: ""
+description: |-
+  Manage a reusable Connection (host, port and credentials) that Checks reference by ID.
+---
+
+# ensafely_connection (Resource)
+
+Manages a Connection: a named, reusable set of host, port and credentials for
+a PostgreSQL, MySQL, MongoDB or HTTP target. Checks reference it with
+`connection_id`. Rotating the password here updates every Check that uses the
+Connection.
+
+The password and the HTTP headers are **write-only** arguments (Terraform
+1.11 or newer, or OpenTofu 1.11 or newer). They are never stored in the plan
+or state; the API never returns the password and returns header values masked
+(`****`). Terraform cannot detect a change to a write-only value, so each one
+is sent:
+
+- on create, when it is set;
+- on update, only when its version (`password_wo_version`,
+  `headers_wo_version`) changes. If the value is null at that point, the
+  stored password or headers are cleared.
+
+Changing `password_wo` or `headers_wo` without changing its version produces
+an empty plan and sends nothing; the API keeps the stored value.
+
+## Example usage
+
+{{ tffile "examples/resources/ensafely_connection/resource.tf" }}
+
+To rotate the password, change the value and increment
+`password_wo_version` (for example from `1` to `2`) in the same apply. The
+same applies to `headers_wo` and `headers_wo_version`; the whole map is sent
+and replaces the stored headers.
+
+For `http` Connections, a username with a password is sent as basic auth; a
+password without a username is sent as `Authorization: Bearer <password>`.
+
+{{ .SchemaMarkdown | trimspace }}
+
+Headers are not part of `params`: use `headers_wo`.
+
+`params.base_url` must not contain a password (`https://user:pw@host`): the API
+masks URL passwords, so they cannot be kept in state. A password-bearing
+`base_url` set outside Terraform shows up masked in the plan and is removed on
+apply.
+
+The API accepts arbitrary keys in `params` (the app's JSON editor can set
+them). Keys this schema does not model are not stored in state and are
+preserved when Terraform updates the Connection.
+
+## Destroy
+
+Destroy deletes the Connection. The API refuses while Checks still reference
+it; the error lists those Checks. When the Checks are in the same
+configuration and reference `ensafely_connection.<name>.id`, Terraform already
+destroys or updates them first.
+
+## Import
+
+{{ codefile "shell" "examples/resources/ensafely_connection/import.sh" }}
+
+Or use an import block (with `terraform plan -generate-config-out=generated.tf`
+to generate configuration):
+
+```terraform
+import {
+  to = ensafely_connection.orders_db
+  id = "0b6f1f7e-4c4e-4f5b-9a63-2f4d3c2b1a00"
+}
+```
+
+The ID is the Connection's UUID (`GET /api/connections` lists them). Import
+reads every non-secret argument. The password, the headers and their versions
+cannot be read back: after import, add `password_wo`/`password_wo_version`
+(and `headers_wo`/`headers_wo_version` if used) to the configuration; the next
+apply then sends them once. Until a version is set, the API keeps the stored
+password and headers.

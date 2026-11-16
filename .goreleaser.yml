@@ -1,0 +1,75 @@
+# Release build for the Terraform and OpenTofu registries, in the layout of
+# HashiCorp's terraform-provider-scaffolding-framework. It runs in the public
+# mirror github.com/imcitius/terraform-provider-ensafely on a vX.Y.Z tag
+# (.github/workflows/release.yml); in the monorepo,
+# scripts/release-tfprovider.sh --check runs it as a snapshot with a
+# throwaway signing key. See docs/operations/tfprovider-release.md.
+version: 2
+project_name: terraform-provider-ensafely
+builds:
+  - env:
+      # A static binary: the registries serve it to any host of its os/arch.
+      - CGO_ENABLED=0
+    # Reproducible: file times and paths come from the commit, not the build host.
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w -X main.version={{ .Version }}'
+    goos:
+      - freebsd
+      - windows
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - '386'
+      - arm
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: '386'
+      # Not a port of current Go releases.
+      - goos: windows
+        goarch: arm
+    # Terraform finds the plugin by this file name inside the zip.
+    binary: '{{ .ProjectName }}_v{{ .Version }}'
+archives:
+  - formats: [zip]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    # The binary plus the MPL-2.0 LICENSE (the registries need only the
+    # binary; the license travels with every copy).
+    files:
+      - src: LICENSE
+        info:
+          mtime: '{{ .CommitDate }}'
+    builds_info:
+      mtime: '{{ .CommitDate }}'
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  algorithm: sha256
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
+signs:
+  # Detached signature <SHA256SUMS>.sig, made with the key whose fingerprint
+  # is GPG_FINGERPRINT (imported in CI from the GPG_PRIVATE_KEY secret). The
+  # registries verify it against the public key registered for the namespace.
+  - artifacts: checksum
+    args:
+      - --batch
+      - --local-user
+      - '{{ .Env.GPG_FINGERPRINT }}'
+      - --output
+      - '${signature}'
+      - --detach-sign
+      - '${artifact}'
+release:
+  github:
+    owner: imcitius
+    name: terraform-provider-ensafely
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
+changelog:
+  disable: true
